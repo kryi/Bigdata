@@ -1,0 +1,73 @@
+import java.util.*;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.URI;
+import java.net.URISyntaxException;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hbase.*;
+import org.apache.hadoop.hbase.client.HBaseAdmin;
+import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.yarn.webapp.hamlet.HamletSpec;
+
+
+/**
+ * Created by hou on 2016/4/10.
+ */
+class HDFS{
+    ArrayList<String[]> Read(String fileName) throws IOException,URISyntaxException{
+        String filePath="hdfs://localhost:9000/"+fileName;
+        Configuration conf = new Configuration();
+        FileSystem fs = FileSystem.get(URI.create(filePath), conf);
+        Path path = new Path(filePath);
+        FSDataInputStream in_stream = fs.open(path);
+        BufferedReader in = new BufferedReader(new InputStreamReader(in_stream));
+        String s;
+        ArrayList <String[]> Table =new ArrayList<>();
+        String []strTuple ;
+        int cnt =0;
+        while ((s=in.readLine())!=null) {
+            cnt ++;
+            System.out.println(cnt+" "+s);
+            strTuple= s.split("|");
+            Table.add(strTuple);
+
+        }
+        in.close();
+        fs.close();
+        System.out.println("read "+fileName+" successfully");
+        return Table;
+    }
+}
+class Operate1{
+    String R_path,S_path;
+    int join_R,join_S;
+    String project;
+    Operate1(String args[]) {
+//        System.out.println(args.length+" "+args[0]);
+        R_path = args[0].substring(3);
+        S_path = args[1].substring(3);
+        this.join_R = Integer.parseInt(args[2].substring(6).split("=S")[0]);
+        this.join_S = Integer.parseInt(args[2].substring(6).split("=S")[1]);
+        this.project = args[3].substring(4);
+    }
+
+}
+public class test {
+    public  static void  main(String args[])throws IOException,URISyntaxException
+    {
+        Operate1 op =new Operate1(args);
+        HDFS ht =new HDFS();
+
+        ArrayList<String []> R = ht.Read(op.R_path);
+        ArrayList<String []> S = ht.Read(op.S_path);
+
+    }
+
+}
