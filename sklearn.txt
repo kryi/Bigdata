@@ -1,0 +1,48 @@
+import numpy as np
+import scipy as sp
+from sklearn import tree
+from sklearn.metrics import precision_recall_curve
+from sklearn.metrics import classification_report
+from sklearn.cross_validation import train_test_split
+
+
+data = []
+labels = []
+
+with open('label.txt') as labelfile:
+    for line in labelfile:
+          labels = line.rstrip('\n').split('\t')
+    labels = map(eval, labels)
+#    print labels
+
+with open('data.txt') as datafile:
+      for line in datafile:
+        tem =line.rstrip('\n').split('\t')
+        tem = map(eval, tem)
+        data.append(tem)
+data = [[r[col] for r in data] for col in range(len(data[0]))]
+
+#print(data)
+
+x = np.array(data)
+labels = np.array(labels)
+
+#label to 0/1
+y = np.zeros(labels.shape)
+y[labels == '-1'] = 1
+print(y)
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size = 0.2)
+clf = tree.DecisionTreeClassifier(criterion='entropy')
+print(clf)
+clf.fit(x_train, y_train)
+print(clf.feature_importances_)
+answer = clf.predict(x_train)
+with open("tree.dot", 'w') as f:
+    f = tree.export_graphviz(clf, out_file=f)
+print(clf.feature_importances_)
+print(answer)
+
+print(np.mean(answer == y_train))
+precision, recall, thresholds = precision_recall_curve(y_train, clf.predict(x_train))
+answer = clf.predict_proba(x)[:,1]
+print(classification_report(y, answer, target_names = ['-1', '1']))

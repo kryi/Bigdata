@@ -1,0 +1,42 @@
+  def read_xml(self):
+
+      DOMTree = xml.dom.minidom.parse("banana_data.xml")
+      Data = DOMTree.documentElement
+
+      dataset = Data.getElementsByTagName("hdf5:Dataset")
+      for x in dataset:
+        if x.getAttribute("Name") == "data":
+           dff = x.getElementsByTagName("hdf5:DataFromFile")
+           self.data = list(dff[0].firstChild.data)
+           print "data = %s" % self.data
+
+# datafromfile =
+ #
+            #self.data = x.childNodes[0].data
+            #print self.data
+class Dataset:
+
+  def __init__(self):
+    self.data = []
+    self.label = []
+    self.labelfile ="label.txt"
+    self.datafile ="data.txt"
+  def read_file(self):
+    with open(self.labelfile, 'r') as label:
+      for line in label:
+            self.label = line.rstrip('\n').split('\t')
+      self.label = map(eval, self.label)
+    print self.label
+    with open(self.datafile, 'r') as data:
+      for line in data:
+        tem =line.rstrip('\n').split('\t')
+        tem = map(eval, tem)
+        self.data.append(tem)
+    print self.data
+
+
+
+
+if __name__=='__main__':
+   ds =Dataset()
+   ds.read_file()

@@ -1,0 +1,159 @@
+import java.util.*;
+import java.util.regex.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.URI;
+import java.net.URISyntaxException;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hbase.*;
+import org.apache.hadoop.hbase.client.HBaseAdmin;
+import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.Put;
+
+
+/**
+ * Created by hou on 2016/4/10.
+ */
+class HDFStest{
+    LinkedList<String> Read(String fileName) throws IOException,URISyntaxException{
+        String filePath="hdfs://localhost:9000/"+fileName;
+        Configuration conf = new Configuration();
+        FileSystem fs = FileSystem.get(URI.create(filePath), conf);
+        Path path = new Path(filePath);
+        FSDataInputStream in_stream = fs.open(path);
+        BufferedReader in = new BufferedReader(new InputStreamReader(in_stream));
+        String strTuple;
+        LinkedList <String> Table =new LinkedList<>();
+        while ((strTuple=in.readLine())!=null) {
+            Table.add(strTuple);
+        }
+        in.close();
+        fs.close();
+        System.out.println("read "+fileName+" successfully");
+        return Table;
+    }
+}
+class  HBaseOperate{
+    private String tableName;
+    private Configuration configuration;
+    boolean create(String name) throws IOException {
+        tableName =name;
+        // create table descriptor
+        HTableDescriptor htd = new HTableDescriptor(TableName.valueOf(tableName));
+        // create column descriptor
+        HColumnDescriptor cf = new HColumnDescriptor("res");
+        htd.addFamily(cf);
+        // configure HBase
+        configuration = HBaseConfiguration.create();
+        HBaseAdmin hAdmin = new HBaseAdmin(configuration);
+        if(hAdmin.tableExists(tableName)){
+            hAdmin.disableTable(tableName);
+            hAdmin.deleteTable(tableName);
+        }
+        hAdmin.createTable(htd);
+        hAdmin.close();
+        return  true;
+    }
+    boolean Write(LinkedList<String> set_R,String S,Operate op,int same_raw) throws  IOException {
+//        Pattern pattern =Pattern.compile("\\|");
+//        String []array_s = pattern.split(S);
+//        for (int i=0;i<array_s.length;i++)
+//        {
+//            System.out.println("line "+i+" = "+array_s[i]);
+//        }
+        // put "mytable","abc","mycf:a","789"
+        HTable table = new HTable(configuration,tableName);
+        //System.out.println("s="+S+"\n"+set_R.get(1).split("|")[op.join_R]+"\n+join ="+op.join_S+","+op.join_R);
+
+        Put put = new Put(S.split("\\|")[op.join_R].getBytes());
+        String [] column = op.project.split(",");
+        String suffix ="";
+        for (String set_ : set_R) {
+            for(String c:column){
+                int column_num = Integer.parseInt(c.substring(1));
+                if(same_raw!=0)
+                    suffix = "."+same_raw;
+                if(c.charAt(0)=='R')
+                    put.add("res".getBytes(),(c+suffix).getBytes(),set_.split("\\|")[column_num].getBytes());
+                else
+                    put.add("res".getBytes(),(c+suffix).getBytes(),S.split("\\|")[column_num].getBytes());
+            }
+            same_raw++;
+        }
+        table.put(put);
+        table.close();
+        System.out.println("put successfully");
+        return true;
+    }
+}
+class Operate{
+    String R_path,S_path;
+    int join_R,join_S;
+    String project;
+    Operate(String args[]) {
+//        System.out.println(args.length+" "+args[0]);
+        R_path = args[0].substring(3);
+        S_path = args[1].substring(3);
+        this.join_R = Integer.parseInt(args[2].substring(6).split("=S")[0]);
+        this.join_S = Integer.parseInt(args[2].substring(6).split("=S")[1]);
+        this.project = args[3].substring(4);
+    }
+
+}
+public class Hw1Grp1 {
+    public  static void  main(String args[])throws IOException,URISyntaxException
+    {
+        Operate op =new Operate(args);
+        HDFStest ht =new HDFStest();
+        HBaseOperate hbo =new HBaseOperate();
+        hbo.create("Result");
+
+        LinkedList<String> R = ht.Read(op.R_path,op);
+        LinkedList<String> S = ht.Read(op.S_path,op);
+        //sort R,S
+        sort_array(R,op.join_R);
+        sort_array(S,op.join_S);
+        //R merge join S
+        int i =0,j =0,same_raw;
+        LinkedList<String> set_s =new LinkedList<>();
+        while(i < R.size() && j < S.size())
+        {
+            set_s.clear();
+            set_s.add(R.get(i));
+            String compareStr = R.get(i).split("\\|")[op.join_R];
+            i++;
+            same_raw =0; //same join key
+            while(i <R.size()-1)
+            {
+                if (R.get(i).split("\\|")[op.join_R].equals(compareStr) ) {
+                    i++;
+                    set_s.add(R.get(i));
+                }
+                else break;
+            }
+            while(j<S.size() && compareStr.compareTo(S.get(j).split("\\|")[op.join_S])>0)
+            {
+                j++;
+            }
+            while(j<S.size() && compareStr.compareTo(S.get(j).split("\\|")[op.join_S])==0)
+            {
+                hbo.Write(set_s, S.get(j),op,same_raw);
+                same_raw+=set_s.size();
+                j++;
+            }
+        }
+    }
+    private static void sort_array(LinkedList<String> list, final int column)
+    {
+        Collections.sort(list, new Comparator<String>(){
+            public int compare(String o1, String o2) {
+                return o1.split("\\|")[column].compareTo(o2.split("\\|")[column]);
+            }
+        });
+    }
+}
